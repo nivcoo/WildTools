@@ -44,8 +44,13 @@ public class WCraftingTool extends WTool implements CraftingTool {
 
     @Override
     public boolean onBlockInteract(PlayerInteractEvent e) {
-        if ((e.getClickedBlock().getType() != Material.CHEST && e.getClickedBlock().getType() != Material.TRAPPED_CHEST) ||
-                !BukkitUtils.canInteractBlock(e.getPlayer(), e.getClickedBlock(), e.getItem()))
+        if ((e.getClickedBlock().getType() != Material.CHEST && e.getClickedBlock().getType() != Material.TRAPPED_CHEST))
+            return false;
+
+        if (!BukkitUtils.hasInteractAccess(e.getPlayer(), e.getClickedBlock(), e.getItem()))
+            return false;
+
+        if (!BukkitUtils.canInteractBlock(e.getPlayer(), e.getClickedBlock(), this))
             return false;
 
         BlockState blockState = e.getClickedBlock().getState();
@@ -155,19 +160,18 @@ public class WCraftingTool extends WTool implements CraftingTool {
         return recipeList;
     }
 
-    @SuppressWarnings("deprecation")
     private List<RecipeChoice> getIngredients(Recipe recipe, List<ItemStack> oldList) {
         Map<RecipeChoice, Integer> counts = new HashMap<>();
         List<RecipeChoice> ingredients = new ArrayList<>();
 
         for (ItemStack itemStack : oldList) {
-            RecipeChoice recipeChoice;
+            if (itemStack == null)
+                continue;
 
-            if (itemStack.getData().getData() < 0) {
-                recipeChoice = RecipeChoice.of(plugin.getNMSAdapter().parseChoice(recipe, itemStack));
-            } else {
-                recipeChoice = RecipeChoice.of(itemStack);
-            }
+            // Always resolve the ingredient through the recipe's own choices. Multi-item ingredients
+            // (e.g. sand or red sand) can no longer be detected by the wildcard data value: since 1.20.5
+            // the display item carries an explicit damage component instead, so it never matched real items.
+            RecipeChoice recipeChoice = RecipeChoice.of(plugin.getNMSAdapter().parseChoice(recipe, itemStack));
 
             counts.put(recipeChoice, counts.getOrDefault(recipeChoice, 0) + itemStack.getAmount());
         }
